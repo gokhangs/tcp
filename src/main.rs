@@ -1,8 +1,21 @@
+use etherparse;
 use std::io;
 use tun_tap;
-use etherparse;
+use std::net::Ipv4Addr;
+use tcp::state;
+
+use std::collections::HashMap;
+
+
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+struct Quad {
+   source: (Ipv4Addr, u16),
+   destination: (Ipv4Addr, u16),
+}
+
 
 fn main() -> std::io::Result<()> {
+    let connections : HashMap<Quad, state::TcpState> = Default::default();
     let nic = tun_tap::Iface::new("tun0", tun_tap::Mode::Tun).expect("failed to CI");
     //set the buffer to receive
     let mut buf = [0u8; 1504];
@@ -17,35 +30,33 @@ fn main() -> std::io::Result<()> {
 
         match etherparse::Ipv4HeaderSlice::from_slice(&buf[4..nic_bytes]) {
             Ok(p) => {
-               let src = p.source_addr();
-               let dst = p.destination_addr();
-               let proto = p.protocol();
-               if proto != 0x06 {
-                  //not a tcp packet
-                  continue;
-               }
+                let src = p.source_addr();
+                let dst = p.destination_addr();
+                let proto = p.protocol();
+                if proto != 0x06 {
+                    //not a tcp packet
+                    continue;
+                }
 
-               match etherparse::TcpHeaderSlice::from_slice(&buf[4+p.slice().len()..nic_bytes]) {
-                  Ok(p) => {
-                     eprintln!(
-                        "{} -> {} {}b of TCP to port {}",
-                        src,
-                        dst,
-                        p.slice().len(),
-                        p.destination_port()
-                     );
-                  },
-                  Err(e) => {
-                     eprintln!("Ignoring packet {:}", e);
-                  }
-               }
-            },
+                match etherparse::TcpHeaderSlice::from_slice(&buf[4 + p.slice().len()..nic_bytes]) {
+                    Ok(p) => {
+                        eprintln!(
+                            "{} -> {} {}b of TCP to port {}",
+                            src,
+                            dst,
+                            p.slice().len(),
+                            p.destination_port()
+                        );
+                    }
+                    Err(e) => {
+                        eprintln!("Ignoring packet {:}", e);
+                    }
+                }
+            }
             Err(e) => {
-               eprintln!("Ignoring packet {:}", e);
+                eprintln!("Ignoring packet {:}", e);
             }
         }
-
-
     }
 
     Ok(())

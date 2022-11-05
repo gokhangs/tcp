@@ -15,3 +15,5 @@ tcp interacts with the Kernel via the TUN device (https://www.kernel.org/doc/Doc
 Works with Unix based systems, which provices configurable capabilities (see: man capabilities). Latest OSX releases are moving away from kernel extensions and they are not recommneded.  
 
 Execution binary should be provided with CAP_NET_ADMIN capability, which enables tcp to run various network related operations. Then, ip address of the new tun must be set with "ip addr set".
+
+Each TCP connection state can be handled by associating to the following quad: (source_ip, source_port, destination_ip, destination_port).
