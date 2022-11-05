@@ -9,6 +9,10 @@ fn main() -> std::io::Result<()> {
         let nic_bytes = nic.recv(&mut buf)?;
         let flags = u16::from_be_bytes([buf[0], buf[1]]);
         let proto = u16::from_be_bytes([buf[2], buf[3]]);
+        if proto != 0x0800 {
+            //not ipv4
+            continue;
+        }
         eprintln!(
             "read {} bytes *(flags: {:x}, proto: {:x}),  data: {:x?}",
             nic_bytes - 4,
