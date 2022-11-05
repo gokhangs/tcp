@@ -8,5 +8,6 @@ use std::io;
     let nic_bytes = nic.recv(&mut buf)?;
     eprintln!("read {} bytes {:?}", nic_bytes, &buf[..nic_bytes]);
     Ok(())
+
 }
 
