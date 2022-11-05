@@ -3,6 +3,9 @@ name = "tcp"
 version = "0.1.0"
 edition = "2021"
 
+#[build]
+#target-dir ="/home/gokhansa/.cargo-target"
+
 [lib]
 path = "src/lib.rs"
 
