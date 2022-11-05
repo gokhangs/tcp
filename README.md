@@ -10,3 +10,8 @@ tcp interacts with the Kernel via the TUN device (https://www.kernel.org/doc/Doc
 
     Any write by tcp will go thorugh the TUN and appear to Kernel as it is coming from external network.
 
+
+##Setup
+Works with Unix based systems, which provices configurable capabilities (see: man capabilities). Latest OSX releases are moving away from kernel extensions and they are not recommneded.  
+
+Execution binary should be provided with CAP_NET_ADMIN capability, which enables tcp to run various network related operations. Then, ip address of the new tun must be set with "ip addr set".
