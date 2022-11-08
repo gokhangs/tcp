@@ -1,21 +1,18 @@
 use etherparse;
-use std::io;
-use tun_tap;
-use std::net::Ipv4Addr;
-use tcp::state;
-
 use std::collections::HashMap;
-
+use std::io;
+use std::net::Ipv4Addr;
+use tcp::tcp::State;
+use tun_tap;
 
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 struct Quad {
-   source: (Ipv4Addr, u16),
-   destination: (Ipv4Addr, u16),
+    source: (Ipv4Addr, u16),
+    destination: (Ipv4Addr, u16),
 }
 
-
 fn main() -> std::io::Result<()> {
-    let connections : HashMap<Quad, state::TcpState> = Default::default();
+    let mut connections: HashMap<Quad, State> = Default::default();
     let nic = tun_tap::Iface::new("tun0", tun_tap::Mode::Tun).expect("failed to CI");
     //set the buffer to receive
     let mut buf = [0u8; 1504];
@@ -29,24 +26,24 @@ fn main() -> std::io::Result<()> {
         }
 
         match etherparse::Ipv4HeaderSlice::from_slice(&buf[4..nic_bytes]) {
-            Ok(p) => {
-                let src = p.source_addr();
-                let dst = p.destination_addr();
-                let proto = p.protocol();
-                if proto != 0x06 {
+            Ok(ip_header) => {
+                let src = ip_header.source_addr();
+                let dst = ip_header.destination_addr();
+                if ip_header.protocol() != 0x06 {
                     //not a tcp packet
                     continue;
                 }
-
-                match etherparse::TcpHeaderSlice::from_slice(&buf[4 + p.slice().len()..nic_bytes]) {
-                    Ok(p) => {
-                        eprintln!(
-                            "{} -> {} {}b of TCP to port {}",
-                            src,
-                            dst,
-                            p.slice().len(),
-                            p.destination_port()
-                        );
+                match etherparse::TcpHeaderSlice::from_slice(&buf[4 + ip_header.slice().len()..]) {
+                    Ok(tcp_header) => {
+                        //place that includes all the header info, rest will be TCP packet
+                        let datai = 4 + ip_header.slice().len() + tcp_header.slice().len();
+                        connections
+                            .entry(Quad {
+                                source: (src, tcp_header.source_port()),
+                                destination: (dst, tcp_header.destination_port()),
+                            })
+                            .or_default()
+                            .on_packet(ip_header, tcp_header, &buf[datai..]);
                     }
                     Err(e) => {
                         eprintln!("Ignoring packet {:}", e);
