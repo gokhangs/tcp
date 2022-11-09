@@ -62,13 +62,15 @@ impl Connection {
         tcp_header: etherparse::TcpHeaderSlice<'a>,
         data: &'a [u8],
     ) -> io::Result<Option<Connection>> {
-        let mut buff = [0u8; 1500];
+        let mut buf = [0u8; 1500];
 
         if !tcp_header.syn() {
             //only expected SYN packet
             return Ok(None);
         }
         let iss = 0;
+        let wnd = 1024;
+
         let mut c = Connection {
             state: State::SynRcvd,
             recv: ReceiveSequence {
@@ -87,7 +89,7 @@ impl Connection {
                 iss,
                 una: iss,
                 nxt: iss + 1,
-                wnd: 10,
+                wnd,
 
                 up: false,
                 wl1: 0,
@@ -124,17 +126,89 @@ impl Connection {
                 ip_header.source()[3],
             ],
         );
-        //use entrie buffer to write, and find how much spaces haven't been used yet
+
+        eprintln!("got IP header:  \n{:02x?}", &ip_header);
+        eprintln!("got TCP header: \n{:02x?}", &tcp_header);
+        eprintln!("TCP protocol: \n{:?}", etherparse::IpNumber::Tcp as u8);
+        //use all buffer to write, and find how much spaces haven't been used yet
         let mut unwritten = {
-            let mut unwritten = &mut buff[..];
+            let mut unwritten = &mut buf[..];
             ip.write(&mut unwritten);
             syn_ack.write(&mut unwritten);
             //used to calculate how much space is remaining in the buffer
             unwritten.len()
         };
-        nic.send(&buff[..unwritten]);
+        eprintln!("responding with {:02x?}", &buf[..buf.len() - unwritten]);
+        nic.send(&buf[..unwritten])?;
         return Ok(Some(c));
     }
 
-    pub fn on_packet(&mut self) {}
+    pub fn on_packet<'a>(
+        &mut self,
+        nic: &mut tun_tap::Iface,
+        ip_header: etherparse::Ipv4HeaderSlice<'a>,
+        tcp_header: etherparse::TcpHeaderSlice<'a>,
+        data: &'a [u8],
+    ) -> io::Result<()>//io::Result<Option<&mut Self>> 
+    {
+    	// let mut buff = [0u8; 1500];
+
+     //    self.recv.nxt = tcp_header.sequence_number();
+     //    self.recv.irs = tcp_header.sequence_number() + 1;
+     //    self.recv.wnd = tcp_header.window_size();
+     //    self.recv.up = false;
+
+     //    self.send.iss = 0;
+     //    self.send.una = self.send.iss;
+     //    self.send.nxt = self.send.iss + 1;
+     //    self.send.wnd = 10;
+
+     //    self.send.up = false;
+     //    self.send.wl1 = 0;
+     //    self.send.wl2 = 0;
+
+     //    //establish connection, reply with Syn Ack
+     //    let mut syn_ack = etherparse::TcpHeader::new(
+     //        tcp_header.destination_port(),
+     //        tcp_header.source_port(),
+     //        self.send.iss,
+     //        self.send.wnd,
+     //    );
+
+     //    syn_ack.acknowledgment_number = self.recv.nxt;
+     //    syn_ack.syn = true;
+     //    syn_ack.ack = true;
+
+     //    let mut ip = etherparse::Ipv4Header::new(
+     //        syn_ack.header_len(),
+     //        64,
+     //        etherparse::IpNumber::Tcp as u8,
+     //        [
+     //            ip_header.destination()[0],
+     //            ip_header.destination()[1],
+     //            ip_header.destination()[2],
+     //            ip_header.destination()[3],
+     //        ],
+     //        [
+     //            ip_header.source()[0],
+     //            ip_header.source()[1],
+     //            ip_header.source()[2],
+     //            ip_header.source()[3],
+     //        ],
+     //    );        
+
+
+
+     //    //use entrie buffer to write, and find how much spaces haven't been used yet
+     //    let mut unwritten = {
+     //        let mut unwritten = &mut buff[..];
+     //        ip.write(&mut unwritten);
+     //        syn_ack.write(&mut unwritten);
+     //        unwritten.len()
+     //    };
+     //    nic.send(&buff[..unwritten]);
+
+     //    Ok(Some(self))
+     Ok(())
+    }
 }
