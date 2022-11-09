@@ -2,7 +2,7 @@ use etherparse;
 use std::collections::HashMap;
 use std::io;
 use std::net::Ipv4Addr;
-use tcp::tcp::State;
+use tcp::tcp::Connection;
 use tun_tap;
 
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
@@ -12,8 +12,8 @@ struct Quad {
 }
 
 fn main() -> std::io::Result<()> {
-    let mut connections: HashMap<Quad, State> = Default::default();
-    let nic = tun_tap::Iface::new("tun0", tun_tap::Mode::Tun).expect("failed to CI");
+    let mut connections: HashMap<Quad, Connection> = Default::default();
+    let mut nic = tun_tap::Iface::new("tun0", tun_tap::Mode::Tun).expect("failed to CI");
     //set the buffer to receive
     let mut buf = [0u8; 1504];
     loop {
@@ -33,7 +33,7 @@ fn main() -> std::io::Result<()> {
                     //not a tcp packet
                     continue;
                 }
-                match etherparse::TcpHeaderSlice::from_slice(&buf[4 + ip_header.slice().len()..]) {
+                match etherparse::TcpHeaderSlice::from_slice(&buf[4 + ip_header.slice().len()..nic_bytes]) {
                     Ok(tcp_header) => {
                         //place that includes all the header info, rest will be TCP packet
                         let datai = 4 + ip_header.slice().len() + tcp_header.slice().len();
@@ -43,7 +43,7 @@ fn main() -> std::io::Result<()> {
                                 destination: (dst, tcp_header.destination_port()),
                             })
                             .or_default()
-                            .on_packet(ip_header, tcp_header, &buf[datai..]);
+                            .on_packet( &mut nic, ip_header, tcp_header, &buf[datai..nic_bytes])?;
                     }
                     Err(e) => {
                         eprintln!("Ignoring packet {:}", e);
