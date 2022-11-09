@@ -1,5 +1,5 @@
 use etherparse;
-use std::collections::HashMap;
+use std::collections::hash_map::{Entry, HashMap};
 use std::io;
 use std::net::Ipv4Addr;
 use tcp::tcp::Connection;
@@ -12,6 +12,7 @@ struct Quad {
 }
 
 fn main() -> std::io::Result<()> {
+    //All TCP connections
     let mut connections: HashMap<Quad, Connection> = Default::default();
     let mut nic = tun_tap::Iface::new("tun0", tun_tap::Mode::Tun).expect("failed to CI");
     //set the buffer to receive
@@ -33,17 +34,33 @@ fn main() -> std::io::Result<()> {
                     //not a tcp packet
                     continue;
                 }
-                match etherparse::TcpHeaderSlice::from_slice(&buf[4 + ip_header.slice().len()..nic_bytes]) {
+                match etherparse::TcpHeaderSlice::from_slice(
+                    &buf[4 + ip_header.slice().len()..nic_bytes],
+                ) {
                     Ok(tcp_header) => {
                         //place that includes all the header info, rest will be TCP packet
                         let datai = 4 + ip_header.slice().len() + tcp_header.slice().len();
-                        connections
-                            .entry(Quad {
-                                source: (src, tcp_header.source_port()),
-                                destination: (dst, tcp_header.destination_port()),
-                            })
-                            .or_default()
-                            .on_packet( &mut nic, ip_header, tcp_header, &buf[datai..nic_bytes])?;
+
+                        match connections.entry(Quad {
+                            source: (src, tcp_header.source_port()),
+                            destination: (dst, tcp_header.destination_port()),
+                        }) {
+                            //If this quad exists in the connections map, use that connection to handle incoming packet
+                            Entry::Occupied(mut c) => {
+                                c.get_mut().on_packet();
+                            }
+                            //If this quad is not in our connections map, initiate a new connection via accept method
+                            Entry::Vacant(e) => {
+                                if let Some(c) = Connection::accept(
+                                    &mut nic,
+                                    ip_header,
+                                    tcp_header,
+                                    &buf[datai..nic_bytes],
+                                )? {
+                                    e.insert(c);
+                                }
+                            }
+                        }
                     }
                     Err(e) => {
                         eprintln!("Ignoring packet {:}", e);
